@@ -1,0 +1,4 @@
+import {env} from 'cloudflare:workers';
+import {getChatGPTUser} from '../../chatgpt-auth';
+import {classify} from '../../../lib/finance';
+export async function POST(req:Request){if(!await getChatGPTUser())return Response.json({error:'Sign in first.'},{status:401});try{const d:any=await req.json();if(typeof d.description!=='string'||d.description.length>255||!['INCOME','EXPENSE'].includes(d.direction))throw Error();const e=env as any;if(e.ML_API_URL&&e.ML_API_KEY){const r=await fetch(e.ML_API_URL.replace(/\/$/,'')+'/classify',{method:'POST',headers:{'Content-Type':'application/json','X-API-Key':e.ML_API_KEY},body:JSON.stringify(d),signal:AbortSignal.timeout(6000)});if(r.ok){const p:any=await r.json();if(['BUSINESS','PERSONAL'].includes(p.scope)&&typeof p.category==='string')return Response.json(p)}}return Response.json(classify(d.description,d.direction))}catch{return Response.json({error:'Unable to classify this transaction.'},{status:400})}}
