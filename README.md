@@ -6,6 +6,7 @@ A financial workspace for freelancers and independent professionals. The project
 
 - Dashboard with period filters, current total/unreserved funds, income, expenses, net flow and charts.
 - Transaction create/edit/delete/search, personal/business classification, category suggestions and CSV export.
+- CSV / Excel (.xlsx) bank-statement upload: local parsing, column mapping, review, duplicate detection, commitment matching, atomic import and import history.
 - Multiple manually tracked accounts with explicit opening balance dates.
 - Virtual reserve pots, target amounts, percentage guidelines, allocation/release history and over-allocation checks.
 - One-time, weekly and monthly scheduled expenses and expected income; month-end recurrence handling.
@@ -74,13 +75,33 @@ Current funds equal opening balances plus actual recorded cash movement. Expecte
 
 ## Verification
 
-- Nine finance-engine tests pass for exact paise arithmetic, reserve invariants, settlement de-duplication, simulation isolation, ownership validation, monthly recurrence, tax boundaries and snapshot inputs.
+- 25 TypeScript finance/import tests pass for exact paise arithmetic, reserve invariants, settlement de-duplication, simulation isolation, ownership validation, monthly recurrence, tax boundaries and snapshot inputs.
 - Hosted TypeScript checks and production build pass.
 - Portable Vite frontend production build passes using the available shared packages.
 - Python source syntax checks pass.
-- Browser QA covers transaction save, classification suggestion, reserve allocation, forecast/simulator, tax estimator and report navigation.
-- The Spring Boot/PostgreSQL/Docker runtime has not been compiled or executed here: this environment has a Java runtime but no JDK compiler, Maven or Docker. Run `mvn verify` / Docker Compose before relying on that edition. No external Gemini or trained ML call has been exercised without credentials/models.
+- Browser QA covers transaction save, classification suggestion, reserve allocation, forecast/simulator, tax estimator and report navigation. Browser checks also confirm CSV and XLSX upload, mapped previews, classification warnings, selected imports, exact decimal amounts and import receipts.
+- The Java finance and statement-import domain classes compile through the installed JDK compiler module. The dependency-free `ImportSmoke` checks pass for exact paise, duplicate handling, rollback, legacy workspaces, preserved identities and commitment settlement. The full Spring Boot/PostgreSQL/Docker stack and JUnit suite remain unexecuted here because Maven and Docker are unavailable. Run `mvn verify` / Docker Compose before relying on that runtime. No external Gemini or trained ML call has been exercised without credentials/models.
 
 ## Before handling production finances
 
 This is a project application, not a bank or tax filing service. Add production monitoring, rate limiting, tested backups, schema migrations (replace portable `ddl-auto=update`), recovery/version history, email verification and password reset, provider quota controls and a security review for the chosen deployment. These operations are not implemented by the current project. Review financial/tax rules with a qualified professional for your use case.
+
+## Bank-statement upload and import
+
+Open **Import statement** in the sidebar, or select **Import statement** on the dashboard / Smart Ledger.
+
+1. Select a CSV or unprotected `.xlsx` file (maximum 5 MB, 2,000 transaction rows, 100 worksheet columns, 20 worksheets). PDF and legacy `.xls` are not supported. CSV must use UTF-8 encoding.
+2. Choose the destination account and worksheet. Select the actual header row (within the first 20 rows). Column suggestions are editable. CSV separators: comma, semicolon or tab.
+3. Map date/description and either separate debit-credit columns, amount + type, or a signed amount (positive credit, negative debit). Pick DMY, MDY or YMD for numeric dates. ISO dates and Excel date cells are recognized. Four-digit years are preferred; two-digit years map to 2000–2099. Amounts support INR prefixes, Indian/international comma grouping and decimal points, with at most two fractional digits.
+4. Preview every extracted record. Keyword rules suggest purpose/category; this import flow does not call Gemini or the optional ML API. Transfers, refunds, loans, balance rows, unclear descriptions and duplicate candidates start unchecked. Invalid dates/amounts and conflicting debit/credit values cannot be selected. Edit or exclude uncertain classifications.
+5. Optionally link a selected row to an outstanding commitment with the same account, amount and direction. This records settlement without double-counting expected income. The user must confirm the match; no automatic matching is claimed.
+6. Confirm that the account opening balance predates the selected transactions and does not already include them, then import at most 200 selected rows per batch. All validation occurs server-side again. An invalid selected row aborts the entire batch. Reserve checks use the final batch balance, not transient row order.
+
+The original file remains on the device. Only selected normalized transaction records, bank references, immutable duplicate identities, source batch IDs and a filename-based audit record are saved. No source file or model-provider upload is made. Imported rows are labeled in the ledger. Import history retains 50 batches and shows imported/skipped counts. Existing records and older workspaces remain compatible.
+
+Duplicate detection is scoped to the destination account. A matching bank reference/date/amount/direction is skipped even if its description changed. Without references, matching date/amount/direction/normalized description is a **possible duplicate**; legitimate repeated payments can be explicitly selected after review. Duplicate identities survive ordinary edits to imported ledger rows. This is a heuristic, not a guarantee: providers can reuse references or vary statement descriptions/dates, so review overlapping statements and your account balance. Deleting an imported ledger transaction permits a later re-import; no deleted-record tombstone is retained.
+
+Import is the authenticated workspace command `importStatement` in both the hosted TypeScript API and Java backend. The browser parses CSV/XLSX using the shared parser and ExcelJS; Java validates and persists normalized rows atomically in PostgreSQL. This is statement import, not live bank synchronization.
+
+A fictional example is provided in `public/samples/bank-statement.csv` and the UI’s **Sample CSV** link. Source dates are October 2026; choose an account opening date on or before its first transaction when testing.
+

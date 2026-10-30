@@ -52,5 +52,4 @@ portable/backend/target/
 portable/frontend/node_modules/
 portable/frontend/dist/
 __pycache__/
-
 !portable/.env.example

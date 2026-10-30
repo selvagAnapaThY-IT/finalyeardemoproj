@@ -37,7 +37,7 @@ All monetary fields use integer **paise**. For ₹1,234.56 send `123456`. User I
 | POST `/api/classify` | `{description,direction}`; ML when configured, rules otherwise |
 | POST `/api/advisor` | `{question}`; Gemini when configured |
 
-Commands: `initialize`, `profile`, `account`, `transaction`, `deleteTransaction`, `commitment`, `deleteCommitment`, `settle`, `pot`, `allocate`, `release`, `saveForecast`, `saveTax`, `dismiss`. Payload shapes are defined by the shared UI and `Finance.java`. The API uses an aggregate command interface rather than the separate resource endpoints originally proposed in the blueprint.
+Commands: `initialize`, `profile`, `account`, `transaction`, `deleteTransaction`, `commitment`, `deleteCommitment`, `settle`, `pot`, `allocate`, `release`, `saveForecast`, `saveTax`, `dismiss`, `importStatement`. Payload shapes are defined by the shared UI and `Finance.java`. The API uses an aggregate command interface rather than the separate resource endpoints originally proposed in the blueprint.
 
 ## Gemini
 
@@ -60,6 +60,23 @@ For synthetic data, use `--synthetic` and keep the demonstration status explicit
 
 ## Tests and known verification limit
 
-`mvn verify` runs Java finance-domain tests; the backend Docker build executes them. Java compilation, Spring integration tests, PostgreSQL behavior and the Compose stack still require execution on a machine with JDK/Maven or Docker. They could not be run in the authoring environment. The React frontend build, hosted TypeScript engine tests and Python syntax were checked.
+`mvn verify` runs Java finance-domain tests; the backend Docker build executes them. The Java domain compiles and dependency-free import smoke checks pass. Full Spring compilation, JUnit integration tests, PostgreSQL behavior and the Compose stack still require execution with Maven or Docker. The React frontend build, hosted TypeScript engine tests and Python syntax were checked.
 
 See the root README for supported financial features, tax scope, storage limits and omitted production operations.
+
+## Import a bank statement
+
+After adding an account, use **Import statement**. CSV and `.xlsx` are parsed locally in React. Review column mapping and selected rows before confirming. Spring Boot validates the normalized `importStatement` command, checks account ownership via the authenticated workspace, skips duplicates and writes the batch atomically. There is no separate file-upload endpoint or Apache POI requirement: the backend does not store raw bank files.
+
+The command data contains `accountId`, `fileName`, a per-attempt `requestId`, `reviewAcknowledged: true`, and 1–200 `rows`. Each row has `date`, `description`, integer-paise `amount`, `direction`, `scope`, `category`, optional `reference`, optional `allowDuplicate`, and optional `commitmentId`/`occurrence`. Never send another user's account ID. Date and reserve constraints are enforced on the server.
+
+`StatementImportTest` adds Java tests for atomicity, reference de-duplication, explicitly included repeat payments and legacy JSON compatibility. These Java tests still require Maven/JDK to execute. See the root README for limits and assumptions.
+
+To run the dependency-free Java domain smoke checks without Maven, from the repository root:
+
+```sh
+java -m jdk.compiler/com.sun.tools.javac.Main -d /tmp/fintax-java portable/backend/src/main/java/com/fintaxpro/Finance.java portable/backend/src/main/java/com/fintaxpro/StatementImports.java portable/backend/src/test/java/com/fintaxpro/ImportSmoke.java
+java -cp /tmp/fintax-java com.fintaxpro.ImportSmoke
+```
+
+Use a suitable output directory instead of `/tmp/fintax-java` on Windows. These checks do not replace `mvn verify` or a database-backed integration test.

@@ -1,0 +1,14 @@
+package com.fintaxpro;
+import java.util.*;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+class StatementImportTest {
+ Finance.State fixture(){return Finance.apply(Finance.empty("Test"),"account",Map.of("name","Bank","opening",1000000,"asOf",Finance.today().minusDays(60).toString()));}
+ Map<String,Object> row(String reference){Map<String,Object> r=new HashMap<>();r.put("date",Finance.today().toString());r.put("description","Client project");r.put("amount",2000000);r.put("direction","INCOME");r.put("scope","BUSINESS");r.put("category","Client payment");r.put("reference",reference);return r;}
+ Map<String,Object> batch(Finance.State s,List<Map<String,Object>> rows){return Map.of("accountId",s.accounts().get(0).id(),"fileName","bank.csv","requestId","batch-1","reviewAcknowledged",true,"rows",rows);}
+ @Test void importIsExactAndRepeatedReferencesAreSkipped(){Finance.State s=fixture();Finance.State result=Finance.apply(s,"importStatement",batch(s,List.of(row("REF"),row("REF"))));assertEquals(1,result.transactions().size());assertEquals(3000000,Finance.balance(result));assertEquals(1,result.importHistory().get(0).duplicatesSkipped());assertEquals(0,s.transactions().size());assertThrows(IllegalArgumentException.class,()->Finance.apply(result,"importStatement",batch(result,List.of(row("REF")))));}
+ @Test void badRowsRollbackTheWholeBatch(){Finance.State s=fixture();Map<String,Object> invalid=row("BAD");invalid.put("amount",-1);assertThrows(IllegalArgumentException.class,()->Finance.apply(s,"importStatement",batch(s,List.of(row("GOOD"),invalid))));assertTrue(s.transactions().isEmpty());assertTrue(s.importHistory().isEmpty());}
+ @Test void possibleDuplicateRequiresExplicitAcknowledgement(){Finance.State s=fixture();Map<String,Object> second=row("");second.put("allowDuplicate",true);Finance.State result=Finance.apply(s,"importStatement",batch(s,List.of(row(""),second)));assertEquals(2,result.transactions().size());assertEquals(5000000,Finance.balance(result));}
+ @Test void referenceDuplicateCannotBeOverridden(){Finance.State s=fixture();Map<String,Object> second=row("SAME");second.put("allowDuplicate",true);Finance.State result=Finance.apply(s,"importStatement",batch(s,List.of(row("SAME"),second)));assertEquals(1,result.transactions().size());}
+ @Test void olderWorkspaceWithoutHistoryRemainsReadable()throws Exception{com.fasterxml.jackson.databind.ObjectMapper mapper=new com.fasterxml.jackson.databind.ObjectMapper();Finance.State s=fixture();String legacy=mapper.writeValueAsString(s).replace(",\"importHistory\":[]","");Finance.State parsed=mapper.readValue(legacy,Finance.State.class);Finance.State result=Finance.apply(parsed,"importStatement",batch(parsed,List.of(row("NEW"))));assertEquals(1,result.importHistory().size());assertEquals(1,result.transactions().size());}
+}

@@ -1,0 +1,9 @@
+Date,Description,Debit,Credit,Reference
+2026-10-01,Website development client payment,,20000,DEMO-CLIENT-001
+2026-10-02,Weekly grocery shopping,1500,,DEMO-GROCERY-002
+2026-10-03,Office rent,8000,,DEMO-RENT-003
+2026-10-04,Transfer to own savings account,5000,,DEMO-TRANSFER-004
+2026-10-05,Merchant refund,,500,DEMO-REFUND-005
+2026-10-06,Figma software subscription,1500,,DEMO-SOFTWARE-006
+2026-10-07,Unclear merchant transaction,250,,DEMO-REVIEW-007
+2026-10-08,"Client project, second milestone",,12500.50,DEMO-CLIENT-008
